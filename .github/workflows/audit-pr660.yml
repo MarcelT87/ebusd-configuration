@@ -1,0 +1,57 @@
+name: Audit PR660 generated output
+
+on:
+  push:
+    branches:
+      - audit/pr660-generated-output-20261005
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Install pinned TypeSpec toolchain
+        run: |
+          npm install --no-save --legacy-peer-deps \
+            @ebusd/ebus-typespec@0.29.0 \
+            @typespec/compiler@1.12.0 \
+            @typespec/asset-emitter@0.79.1 \
+            @typespec/library-linter@0.81.0 \
+            typescript@5.9.3 \
+            @types/node@25.1.0
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Compile EN and DE
+        run: npm run compile
+
+      - name: Verify restored B516 total-statistic rows
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            "08.bai.csv"
+            "08.hmu.csv"
+            "08.hmu.HW5103.csv"
+            "15.ctlv2.csv"
+            "26.vr_71.csv"
+            "76.vwz.csv"
+          )
+          pattern='StatSolarEnergySum|StatEnvironmentEnergySum|StatElectricEnergySum|StatFuelSum'
+          for lang in outcsv outcsv.de; do
+            for f in "${files[@]}"; do
+              p="${lang}/@ebusd/ebus-typespec/vaillant/${f}"
+              count="$(grep -Ec ",(StatSolarEnergySum|StatSolarEnergySumHc|StatSolarEnergySumHwc|StatEnvironmentEnergySum|StatEnvironmentEnergySumHc|StatEnvironmentEnergySumHwc|StatEnvironmentEnergySumCool|StatElectricEnergySum|StatElectricEnergySumHc|StatElectricEnergySumHwc|StatElectricEnergySumCool|StatFuelSum|StatFuelSumHc|StatFuelSumHwc)," "$p" || true)"
+              echo "${p}: ${count}"
+              test "$count" -eq 14
+            done
+          done
+          echo "B516 restored total-statistic rows: 14/14 in all checked EN/DE outputs"
