@@ -1,0 +1,43 @@
+name: Validate F2-F6 draft
+
+on:
+  push:
+    branches:
+      - research/ctlv2-absence-f2-f6
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Install pinned TypeSpec toolchain
+        run: |
+          npm install --no-save --legacy-peer-deps \
+            @ebusd/ebus-typespec@0.29.0 \
+            @typespec/compiler@1.12.0 \
+            @typespec/asset-emitter@0.79.1 \
+            @typespec/library-linter@0.81.0 \
+            typescript@5.9.3 \
+            @types/node@25.1.0
+          npm ls @ebusd/ebus-typespec @typespec/compiler @typespec/asset-emitter @typespec/library-linter
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Compile EN and DE
+        run: npm run compile
+
+      - name: Verify generated F2-F6 rows
+        run: |
+          grep -R -nE 'Holiday(Start|End)(Period|Time)|HolidayRoomTemp' outcsv outcsv.de
+          if grep -R -n 'Holiday.*F7\|@ext(0xf7' outcsv outcsv.de src/vaillant/15.ctlv2.tsp; then
+            echo "Unexpected F7 mapping found"
+            exit 1
+          fi
